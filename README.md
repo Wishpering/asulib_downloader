@@ -4,7 +4,7 @@
 
 ## Getting Started
 
-git clone https://github.com/Wishpering/book_downloader.git
+git clone https://github.com/Wishpering/asulib_downloader.git
 
 ### Требования
 
