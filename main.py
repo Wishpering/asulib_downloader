@@ -3,11 +3,11 @@
 import logging
 from bs4 import BeautifulSoup as bs4
 from os.path import dirname, abspath, exists
-from os import mkdir
 import asyncio
 from threading import Thread
 import aiohttp
 from random import uniform
+from img2pdf import convert
 
 def start_background_loop(loop: asyncio.AbstractEventLoop):
         asyncio.set_event_loop(loop)
@@ -72,12 +72,11 @@ class Book:
                 )
             )
 
-        print(len(tasks))
-
         return await asyncio.gather(*tasks)
 
     async def __downloader(self, link, headers):
-        await asyncio.sleep(uniform(0, 5))
+        # Спим сколько-то перед запуском потока, а то сервак охуевает, если много страниц 
+        await asyncio.sleep(uniform(0, 20))
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -91,11 +90,8 @@ class Book:
             self.logger.exception(error)
 
 if __name__ == '__main__':
+    output_Filename = 'output'
     Path = str(dirname(abspath(__file__))) + '/'
-
-    # Проверяем, что есть директория под скаченные файлы
-    if exists(Path + 'output') is False:
-        mkdir(Path + 'output')
 
     logging.basicConfig(filename = Path + 'log.txt', level = logging.DEBUG)
     log_File = logging.getLogger("Book downloader")
@@ -131,10 +127,21 @@ if __name__ == '__main__':
         Loop.loop
     ).result()
 
-    # Записываем все скаченное в файлы
+    # Проверяем, все ли скачалось
     for res, count in zip(result_Of_Downloader, range(1, page_Count + 1)):
-        with open(Path + 'output/page' + str(count), 'wb') as file:
-            if res == -1:
-                print('Не удалось загрузить страницу №' + str(count))
-            else:
-                file.write(res)
+        if res == -1:
+            print('Не удалось загрузить страницу №' + str(count))
+
+    # Если файл с таким названием уже существует, то запрашиваем другое название
+    while exists(Path + output_Filename + '.pdf') is True:
+        output_Filename = str(
+            input(
+                'Такой файл уже существует, введите другое название - '
+                )
+            )
+
+    # Конвертируем все в PDF
+    with open(Path + output_Filename + '.pdf', "wb") as file:
+            file.write(
+                convert([res for res in result_Of_Downloader])
+                )
