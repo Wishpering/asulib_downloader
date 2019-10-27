@@ -88,8 +88,7 @@ class Parcer:
         except Exception as error:
             if self.args.get('debug') == True:
                 print('Can\'not get book name and ID', error)
-
-            self.logger.exception('Crash on getting Book_ID and Book_Name' + '\n' + str(error))
+                self.logger.exception('Crash on getting Book_ID and Book_Name' + '\n' + str(error))
             
             exit()
 
@@ -153,45 +152,44 @@ class Book:
         except Exception as error:
             if args.get('debug') == True:
                 print('Can\'not download page №' + num_Of_Task)
-
-            cls.logger.exception(error)
+                cls.logger.exception(error)
 
 if __name__ == '__main__':
-    arguments = {}
     output_Filename = 'output'
-    Path = str(dirname(abspath(__file__))) + '/'
 
     # Парсим аргументы
     arg_Parser = ArgumentParser(description = 'Скрипт для выкачивания чего-то с elibrary.asu')
     arg_Parser.add_argument('-d', '--debug', action = "store_true", help = 'Enable debug mode')
     arg_Parser.add_argument('-v', '--verbose', action = "store_true", help = 'Be more verbose')
+    arg_Parser.add_argument('-o', '--output', type = str, help = 'Change output directory')
+    required = arg_Parser.add_argument_group('Required')    
+    required.add_argument('-p', '--pages', help = 'Количество страниц', type = int, required = True)
+    required.add_argument('-l', '--link', help = 'Ссылка на книгу', type = str, required = True)
 
-    args = arg_Parser.parse_args()
+    args = vars(arg_Parser.parse_args())
 
-    if args.debug:
-        arguments['debug'] = True
-    if args.verbose:
-        arguments['verbose'] = True
+    page_Count = args.get('pages')
+    Path = args.get('output') or str(dirname(abspath(__file__))) + '/'
 
     # Запускаем логгер
-    logging.basicConfig(filename = Path + 'log.txt', level = logging.DEBUG)
-    log_File = logging.getLogger("Book downloader")
+    if args.get('debug') == True:
+        logging.basicConfig(filename = Path + 'log.txt', level = logging.DEBUG)
+        log_File = logging.getLogger("Book downloader")
+    else:
+        log_File = None
 
     # Создаем экземпляры классов
-    parcer = Parcer(log_File, arguments)
-    downloader = Book(Loop.loop, log_File, arguments)
-
-    url_For_Downloading = str(input('Ссылка на книгу - '))
-    page_Count = int(input('Сколько страниц в книге - '))
+    parcer = Parcer(log_File, args)
+    downloader = Book(Loop.loop, log_File, args)
 
     # Получаем ID и название книги
     # Они слегка отличаются для Headers и для ссылки на скачивание, посему их 4
     id_For_Headers, id_For_Request, \
         name_For_Headers, name_For_Request \
-            = asyncio.run_coroutine_threadsafe(
-                parcer.get_Link(url_For_Downloading
-                ), 
-            Loop.loop).result()
+            = asyncio.run_coroutine_threadsafe( 
+                parcer.get_Link(args.get('link')
+                ), Loop.loop
+            ).result()
 
     # Выкачиваем все странички
     result_Of_Downloader = asyncio.run_coroutine_threadsafe(
