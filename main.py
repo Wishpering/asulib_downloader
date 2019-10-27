@@ -9,13 +9,23 @@ import aiohttp
 from random import uniform
 from img2pdf import convert
 
+headers = {
+    'Host' : 'elibrary.asu.ru',
+    'Connection' : 'close',
+    'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.70 Safari/537.36',
+    'DNT' : '1',
+    'Accept' : 'image/webp,image/apng,image/*,*/*;q=0.8',
+    'Accept-Encoding' : 'gzip, deflate',
+    'Accept-Language' : 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6'
+    }
+
 def start_background_loop(loop: asyncio.AbstractEventLoop):
         asyncio.set_event_loop(loop)
         loop.run_forever()          
 
 class Loop:
     loop = asyncio.new_event_loop()
-    main_Thread = Thread(target = start_background_loop, args = (loop,), daemon = True).start()    
+    main_Thread = Thread(target = start_background_loop, args = (loop, ), daemon = True).start()    
 
 class Parcer:
     def __init__(self, logger):
@@ -27,13 +37,14 @@ class Parcer:
                 async with session.get(book_Url) as request:
             
                     if request.status != 200:
-                        self.logger.exception('Crash on downloading page for parsing with BeautifulSoup')
+                        self.logger.exception('Can\'not dowload page')
                         exit()
                 
                     request = await request.read()
 
         except Exception as error:
             self.logger.exception(error)
+            exit()
                 
         soup = bs4(request, 'lxml')
         link = soup.frame.extract()['src']
@@ -47,37 +58,45 @@ class Parcer:
             id_For_Request = str(temp[0]).replace('id=', '')
             name_For_Request = str(temp[1]).replace('name=', '')
         
-        except:
-            self.logger.exception('Crash on getting Book_ID and Book_Name')
+        except Exception as error:
+            self.logger.exception('Crash on getting Book_ID and Book_Name' + '\n' + str(error))
+            exit()
 
         return id_For_Headers, id_For_Request, name_For_Headers, name_For_Request
 
 class Book:
-    def __init__(self, Path, loop, logger):
-        self.Path = Path
+    def __init__(self, loop, logger):
         self.loop = Loop
         self.logger = logger
 
-    async def download_Book(self, headers, count_Of_Pages, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request):
+    async def download_Book(self, count_Of_Pages, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request):
         tasks = []
 
-        for i in range(1, page_Count + 1):
+        # Готовим обманку
+        headers['Referer'] = 'http://elibrary.asu.ru/els/files/book?name=' + str(name_For_Headers) + '&id=' + str(id_For_Headers)
+
+        for task_Num in range(1, page_Count + 1):
             tasks.append(
                 asyncio.create_task(
                     Book.__downloader(
-                        self,
-                        'http://elibrary.asu.ru/els/files/test/?name=' + name_For_Request +'&id=' + id_For_Request +'&page=' + str(i) + '&mode=1',
-                        headers  
+                            'http://elibrary.asu.ru/els/files/test/?name='
+                            + name_For_Request +'&id=' + id_For_Request +'&page=' + str(task_Num)
+                            + '&mode=1',
+                            headers,
+                            task_Num
                     )
                 )
             )
-
+            
         return await asyncio.gather(*tasks)
 
-    async def __downloader(self, link, headers):
+    @classmethod
+    async def __downloader(cls, link, headers, num_Of_Task):
         # Спим сколько-то перед запуском потока, а то сервак охуевает, если много страниц 
         await asyncio.sleep(uniform(0, 20))
 
+        print('Spawining thread №' + str(num_Of_Task))
+        
         try:
             async with aiohttp.ClientSession() as session:
                     async with session.get(link, headers = headers) as request:
@@ -87,7 +106,7 @@ class Book:
                             return -1
 
         except Exception as error:
-            self.logger.exception(error)
+            cls.logger.exception(error)
 
 if __name__ == '__main__':
     output_Filename = 'output'
@@ -98,31 +117,24 @@ if __name__ == '__main__':
 
     # Создаем экземпляры классов
     parcer = Parcer(log_File)
-    downloader = Book(Path, Loop.loop, log_File)
+    downloader = Book(Loop.loop, log_File)
 
     url_For_Downloading = str(input('Ссылка на книгу - '))
     page_Count = int(input('Сколько страниц в книге - '))
 
     # Получаем ID и название книги
-    # Они слегка отличаются для Headers и для ссылки на скачивание, посему они дублируются
-    id_For_Headers, id_For_Request, name_For_Headers, name_For_Request = asyncio.run_coroutine_threadsafe(parcer.get_Link(url_For_Downloading), Loop.loop).result()
-
-    # Готовим headers для обманки
-    headers = {
-    'Host' : 'elibrary.asu.ru',
-    'Connection' : 'keep-alive',
-    'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.70 Safari/537.36',
-    'DNT' : '1',
-    'Accept' : 'image/webp,image/apng,image/*,*/*;q=0.8',
-    'Referer' : 'http://elibrary.asu.ru/els/files/book?name=' + str(name_For_Headers) + '&id=' + str(id_For_Headers),
-    'Accept-Encoding' : 'gzip, deflate',
-    'Accept-Language' : 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6'
-    }
+    # Они слегка отличаются для Headers и для ссылки на скачивание, посему их 4
+    id_For_Headers, id_For_Request, \
+        name_For_Headers, name_For_Request \
+            = asyncio.run_coroutine_threadsafe(
+                parcer.get_Link(url_For_Downloading
+                ), 
+            Loop.loop).result()
 
     # Выкачиваем все странички
     result_Of_Downloader = asyncio.run_coroutine_threadsafe(
         downloader.download_Book(
-            headers, page_Count, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request
+            page_Count, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request
         ),
         Loop.loop
     ).result()
