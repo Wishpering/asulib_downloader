@@ -8,6 +8,7 @@ from threading import Thread
 import aiohttp
 from random import uniform
 from img2pdf import convert
+from argparse import ArgumentParser
 
 headers = {
     'Host' : 'elibrary.asu.ru',
@@ -28,28 +29,54 @@ class Loop:
     main_Thread = Thread(target = start_background_loop, args = (loop, ), daemon = True).start()    
 
 class Parcer:
-    def __init__(self, logger):
+    def __init__(self, logger, args : dict):
         self.logger = logger
+        self.args = args
 
     async def get_Link(self, book_Url):
         try:
+            if self.args.get('verbose') == True:
+                print('Downloading page for parsing...')
+
             async with aiohttp.ClientSession() as session:
                 async with session.get(book_Url) as request:
             
                     if request.status != 200:
-                        self.logger.exception('Can\'not dowload page')
+                        if self.args.get('debug') == True:
+                            print('Can\'not dowload page for parsing')
+
+                        self.logger.exception('Can\'not dowload page for parsing')
                         exit()
                 
                     request = await request.read()
 
+            if self.args.get('verbose') == True:
+                print('Page loaded successfully...')
+
         except Exception as error:
+            if self.args.get('debug') == True:
+                print(error)
+
             self.logger.exception(error)
             exit()
                 
-        soup = bs4(request, 'lxml')
-        link = soup.frame.extract()['src']
+        try:
+            if self.args.get('verbose') == True:
+                print('Preparing Beautifulsoup with lxml engine')
+
+            soup = bs4(request, 'lxml')
+            link = soup.frame.extract()['src']
+        except Exception as error:
+            if self.args.get('debug') == True:
+                print('Cannot start BS4', error)
+
+            self.logger.exception(error)
+            exit()
 
         try:
+            if self.args.get('verbose') == True:
+                print('Parsing the page to get book name and ID...')
+
             temp = str(link).split('http://elibrary.asu.ru/els/files/book?')[1].split('&')
 
             id_For_Headers = str(temp[0]).replace('id=', '') + '.7book'
@@ -59,15 +86,23 @@ class Parcer:
             name_For_Request = str(temp[1]).replace('name=', '')
         
         except Exception as error:
+            if self.args.get('debug') == True:
+                print('Can\'not get book name and ID', error)
+
             self.logger.exception('Crash on getting Book_ID and Book_Name' + '\n' + str(error))
+            
             exit()
+
+        if self.args.get('verbose') == True:
+                print('Book name -', name_For_Request, 'Book ID -', id_For_Request)
 
         return id_For_Headers, id_For_Request, name_For_Headers, name_For_Request
 
 class Book:
-    def __init__(self, loop, logger):
+    def __init__(self, loop, logger, args):
         self.loop = Loop
         self.logger = logger
+        self.args = args
 
     async def download_Book(self, count_Of_Pages, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request):
         tasks = []
@@ -76,6 +111,9 @@ class Book:
         headers['Referer'] = 'http://elibrary.asu.ru/els/files/book?name=' + str(name_For_Headers) + '&id=' + str(id_For_Headers)
 
         for task_Num in range(1, page_Count + 1):
+            if self.args.get('verbose') == True:
+                print('Preparing task for downloading page №' + str(task_Num))
+
             tasks.append(
                 asyncio.create_task(
                     Book.__downloader(
@@ -83,7 +121,8 @@ class Book:
                             + name_For_Request +'&id=' + id_For_Request +'&page=' + str(task_Num)
                             + '&mode=1',
                             headers,
-                            task_Num
+                            task_Num,
+                            self.args
                     )
                 )
             )
@@ -91,11 +130,17 @@ class Book:
         return await asyncio.gather(*tasks)
 
     @classmethod
-    async def __downloader(cls, link, headers, num_Of_Task):
+    async def __downloader(cls, link, headers, num_Of_Task, args):
         # Спим сколько-то перед запуском потока, а то сервак охуевает, если много страниц 
-        await asyncio.sleep(uniform(0, 20))
+        cooldown = uniform(0, 20)
 
-        print('Spawining thread №' + str(num_Of_Task))
+        if args.get('verbose') == True or args.get('debug') == True:
+            print('Waiting ' + str(cooldown) + ' seconds before starting thread №' + str(num_Of_Task))
+
+        await asyncio.sleep(cooldown)
+
+        if args.get('verbose') == True:
+            print('Spawining thread for downloading page №' + str(num_Of_Task))
         
         try:
             async with aiohttp.ClientSession() as session:
@@ -106,18 +151,35 @@ class Book:
                             return -1
 
         except Exception as error:
+            if args.get('debug') == True:
+                print('Can\'not download page №' + num_Of_Task)
+
             cls.logger.exception(error)
 
 if __name__ == '__main__':
+    arguments = {}
     output_Filename = 'output'
     Path = str(dirname(abspath(__file__))) + '/'
 
+    # Парсим аргументы
+    arg_Parser = ArgumentParser(description = 'Скрипт для выкачивания чего-то с elibrary.asu')
+    arg_Parser.add_argument('-d', '--debug', action = "store_true", help = 'Enable debug mode')
+    arg_Parser.add_argument('-v', '--verbose', action = "store_true", help = 'Be more verbose')
+
+    args = arg_Parser.parse_args()
+
+    if args.debug:
+        arguments['debug'] = True
+    if args.verbose:
+        arguments['verbose'] = True
+
+    # Запускаем логгер
     logging.basicConfig(filename = Path + 'log.txt', level = logging.DEBUG)
     log_File = logging.getLogger("Book downloader")
 
     # Создаем экземпляры классов
-    parcer = Parcer(log_File)
-    downloader = Book(Loop.loop, log_File)
+    parcer = Parcer(log_File, arguments)
+    downloader = Book(Loop.loop, log_File, arguments)
 
     url_For_Downloading = str(input('Ссылка на книгу - '))
     page_Count = int(input('Сколько страниц в книге - '))
