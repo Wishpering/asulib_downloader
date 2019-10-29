@@ -6,9 +6,10 @@ from os.path import dirname, abspath, exists
 import asyncio
 from threading import Thread
 import aiohttp
-from random import uniform
-from img2pdf import convert
 from argparse import ArgumentParser
+from randomgen import RandomGenerator, MT19937
+from randomgen.entropy import random_entropy
+from img2pdf import convert
 
 headers = {
     'Host' : 'elibrary.asu.ru',
@@ -44,8 +45,8 @@ class Parcer:
                     if request.status != 200:
                         if self.args.get('debug') == True:
                             print('Can\'not dowload page for parsing')
+                            self.logger.exception('Can\'not dowload page for parsing')
 
-                        self.logger.exception('Can\'not dowload page for parsing')
                         exit()
                 
                     request = await request.read()
@@ -56,8 +57,8 @@ class Parcer:
         except Exception as error:
             if self.args.get('debug') == True:
                 print(error)
+                self.logger.exception(error)
 
-            self.logger.exception(error)
             exit()
                 
         try:
@@ -69,8 +70,8 @@ class Parcer:
         except Exception as error:
             if self.args.get('debug') == True:
                 print('Cannot start BS4', error)
-
-            self.logger.exception(error)
+                self.logger.exception(error)
+                
             exit()
 
         try:
@@ -103,6 +104,8 @@ class Book:
         self.logger = logger
         self.args = args
 
+        self.generator = RandomGenerator(MT19937(random_entropy()))
+        
     async def download_Book(self, count_Of_Pages, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request):
         tasks = []
 
@@ -121,7 +124,8 @@ class Book:
                             + '&mode=1',
                             headers,
                             task_Num,
-                            self.args
+                            self.args,
+                            self.generator
                     )
                 )
             )
@@ -129,9 +133,9 @@ class Book:
         return await asyncio.gather(*tasks)
 
     @classmethod
-    async def __downloader(cls, link, headers, num_Of_Task, args):
+    async def __downloader(cls, link, headers, num_Of_Task, args, generator):
         # Спим сколько-то перед запуском потока, а то сервак охуевает, если много страниц 
-        cooldown = uniform(0, 20)
+        cooldown = generator.uniform(0, 10)
 
         if args.get('verbose') == True or args.get('debug') == True:
             print('Waiting ' + str(cooldown) + ' seconds before starting thread №' + str(num_Of_Task))
