@@ -103,12 +103,12 @@ class Book:
         self.loop = Loop
         self.logger = logger
         self.args = args
-
-        self.generator = RandomGenerator(MT19937(random_entropy()))
         
     async def download_Book(self, count_Of_Pages, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request):
         tasks = []
 
+        generator = RandomGenerator(MT19937(random_entropy()))
+        
         # Готовим обманку
         headers['Referer'] = 'http://elibrary.asu.ru/els/files/book?name=' + str(name_For_Headers) + '&id=' + str(id_For_Headers)
 
@@ -125,7 +125,7 @@ class Book:
                             headers,
                             task_Num,
                             self.args,
-                            self.generator
+                            generator
                     )
                 )
             )
