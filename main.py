@@ -159,13 +159,11 @@ class Book:
                 cls.logger.exception(error)
 
 if __name__ == '__main__':
-    output_Filename = 'output'
-
     # Парсим аргументы
     arg_Parser = ArgumentParser(description = 'Скрипт для выкачивания чего-то с elibrary.asu')
     arg_Parser.add_argument('-d', '--debug', action = "store_true", help = 'Enable debug mode')
     arg_Parser.add_argument('-v', '--verbose', action = "store_true", help = 'Be more verbose')
-    arg_Parser.add_argument('-o', '--output', type = str, help = 'Change output directory')
+    arg_Parser.add_argument('-o', '--output', type = str, help = 'Change output directory / filename')
     required = arg_Parser.add_argument_group('Required')    
     required.add_argument('-p', '--pages', help = 'Количество страниц', type = int, required = True)
     required.add_argument('-l', '--link', help = 'Ссылка на книгу', type = str, required = True)
@@ -173,11 +171,11 @@ if __name__ == '__main__':
     args = vars(arg_Parser.parse_args())
 
     page_Count = args.get('pages')
-    Path = args.get('output') or str(dirname(abspath(__file__))) + '/'
+    Path = args.get('output') or str(dirname(abspath(__file__))) + '/output'
 
     # Запускаем логгер
     if args.get('debug') == True:
-        logging.basicConfig(filename = Path + 'log.txt', level = logging.DEBUG)
+        logging.basicConfig(filename = Path + '_log.txt', level = logging.DEBUG)
         log_File = logging.getLogger("Book downloader")
     else:
         log_File = None
@@ -209,7 +207,7 @@ if __name__ == '__main__':
             print('Не удалось загрузить страницу №' + str(count))
 
     # Если файл с таким названием уже существует, то запрашиваем другое название
-    while exists(Path + output_Filename + '.pdf') is True:
+    while exists(Path + '.pdf') is True:
         output_Filename = str(
             input(
                 'Такой файл уже существует, введите другое название - '
@@ -217,7 +215,7 @@ if __name__ == '__main__':
             )
 
     # Конвертируем все в PDF
-    with open(Path + output_Filename + '.pdf', "wb") as file:
+    with open(Path + '.pdf', "wb") as file:
             file.write(
                 convert([res for res in result_Of_Downloader])
                 )
