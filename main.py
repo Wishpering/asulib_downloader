@@ -149,7 +149,8 @@ if __name__ == '__main__':
     arg_Parser = ArgumentParser(description = 'Скрипт для выкачивания чего-то с elibrary.asu')
     arg_Parser.add_argument('-d', '--debug', action = "store_true", help = 'Enable debug mode')
     arg_Parser.add_argument('-v', '--verbose', action = "store_true", help = 'Be more verbose')
-    arg_Parser.add_argument('-o', '--output', type = str, help = 'Change output directory / filename')
+    arg_Parser.add_argument('-o', '--output-dir', type = str, help = 'Change output directory')
+    arg_Parser.add_argument('-f', '--file-name', type = str, help = 'Change file name')
     required = arg_Parser.add_argument_group('Required')    
     required.add_argument('-p', '--pages', help = 'Количество страниц', type = int, required = True)
     required.add_argument('-l', '--link', help = 'Ссылка на книгу', type = str, required = True)
@@ -157,7 +158,13 @@ if __name__ == '__main__':
     args = vars(arg_Parser.parse_args())
 
     page_Count = args.get('pages')
-    Path = args.get('output') or str(dirname(abspath(__file__))) + '/output'
+
+    Path = args.get('output_dir') or str(dirname(abspath(__file__))) + '/output'
+    output_File_Name = args.get('file_name') or 'output'
+
+    # Проверка на корректность указанного пути
+    if Path.endswith('/') is False:
+        Path += '/'
 
     if args.get('debug') == True:
         logger.add(
@@ -205,7 +212,7 @@ if __name__ == '__main__':
     print('Making pdf file ...')
 
     # Конвертируем все в PDF
-    with open(Path + '.pdf', "wb") as file:
+    with open(Path + output_File_Name + '.pdf', "wb") as file:
             file.write(
                 convert([res for res in result_Of_Downloader])
                 )
