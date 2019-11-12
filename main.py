@@ -202,8 +202,8 @@ if __name__ == '__main__':
             print('Не удалось загрузить страницу №' + str(count))
 
     # Если файл с таким названием уже существует, то запрашиваем другое название
-    while exists(Path + '.pdf') is True:
-        Path = str(
+    while exists(Path + output_File_Name + '.pdf') is True:
+        output_File_Name = str(
             input(
                 'Такой файл уже существует, введите другое название - '
                 )
