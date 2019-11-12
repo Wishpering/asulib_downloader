@@ -3,3 +3,4 @@ beautifulsoup4
 lxml
 img2pdf
 randomgen
+loguru

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import logging
+from loguru import logger
 from bs4 import BeautifulSoup as bs4
 from os.path import dirname, abspath, exists
 import asyncio
@@ -23,15 +23,14 @@ headers = {
 
 def start_background_loop(loop: asyncio.AbstractEventLoop):
         asyncio.set_event_loop(loop)
-        loop.run_forever()          
+        loop.run_forever()
 
 class Loop:
     loop = asyncio.new_event_loop()
     main_Thread = Thread(target = start_background_loop, args = (loop, ), daemon = True).start()    
 
 class Parcer:
-    def __init__(self, logger, args : dict):
-        self.logger = logger
+    def __init__(self, args : dict):
         self.args = args
 
     async def get_Link(self, book_Url):
@@ -44,10 +43,7 @@ class Parcer:
             
                     if request.status != 200:
                         if self.args.get('debug') == True:
-                            print('Can\'not dowload page for parsing')
-                            self.logger.exception('Can\'not dowload page for parsing')
-
-                        exit()
+                            logger.exception('Can\'not dowload page for parsing')
                 
                     request = await request.read()
 
@@ -56,23 +52,18 @@ class Parcer:
 
         except Exception as error:
             if self.args.get('debug') == True:
-                print(error)
-                self.logger.exception(error)
-
-            exit()
-                
+                logger.exception('Smth went wrong on getting link')
+            
         try:
             if self.args.get('verbose') == True:
                 print('Preparing Beautifulsoup with lxml engine')
 
             soup = bs4(request, 'lxml')
             link = soup.frame.extract()['src']
+        
         except Exception as error:
             if self.args.get('debug') == True:
-                print('Cannot start BS4', error)
-                self.logger.exception(error)
-                
-            exit()
+                logger.exception('Cannot start BS4')
 
         try:
             if self.args.get('verbose') == True:
@@ -88,10 +79,7 @@ class Parcer:
         
         except Exception as error:
             if self.args.get('debug') == True:
-                print('Can\'not get book name and ID', error)
-                self.logger.exception('Crash on getting Book_ID and Book_Name' + '\n' + str(error))
-            
-            exit()
+                logger.exception('Crash on getting Book_ID and Book_Name')
 
         if self.args.get('verbose') == True:
                 print('Book name -', name_For_Request, 'Book ID -', id_For_Request)
@@ -99,9 +87,8 @@ class Parcer:
         return id_For_Headers, id_For_Request, name_For_Headers, name_For_Request
 
 class Book:
-    def __init__(self, loop, logger, args):
+    def __init__(self, loop, args):
         self.loop = Loop
-        self.logger = logger
         self.args = args
         
     async def download_Book(self, count_Of_Pages, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request):
@@ -155,8 +142,7 @@ class Book:
 
         except Exception as error:
             if args.get('debug') == True:
-                print('Can\'not download page №' + num_Of_Task)
-                cls.logger.exception(error)
+                logger.exception('Can\'not download page №' + num_Of_Task)
 
 if __name__ == '__main__':
     # Парсим аргументы
@@ -173,16 +159,16 @@ if __name__ == '__main__':
     page_Count = args.get('pages')
     Path = args.get('output') or str(dirname(abspath(__file__))) + '/output'
 
-    # Запускаем логгер
     if args.get('debug') == True:
-        logging.basicConfig(filename = Path + '_log.txt', level = logging.DEBUG)
-        log_File = logging.getLogger("Book downloader")
-    else:
-        log_File = None
+        logger.add(
+            'log.file', 
+            colorize = True, backtrace = True, diagnose = True,
+            format = '{time} {message}', level = 'DEBUG'
+            )
 
     # Создаем экземпляры классов
-    parcer = Parcer(log_File, args)
-    downloader = Book(Loop.loop, log_File, args)
+    parcer = Parcer(args)
+    downloader = Book(Loop.loop, args)
 
     # Получаем ID и название книги
     # Они слегка отличаются для Headers и для ссылки на скачивание, посему их 4
@@ -192,6 +178,8 @@ if __name__ == '__main__':
                 parcer.get_Link(args.get('link')
                 ), Loop.loop
             ).result()
+
+    print('Downloading pages ...')
 
     # Выкачиваем все странички
     result_Of_Downloader = asyncio.run_coroutine_threadsafe(
@@ -208,14 +196,18 @@ if __name__ == '__main__':
 
     # Если файл с таким названием уже существует, то запрашиваем другое название
     while exists(Path + '.pdf') is True:
-        output_Filename = str(
+        Path = str(
             input(
                 'Такой файл уже существует, введите другое название - '
                 )
             )
+
+    print('Making pdf file ...')
 
     # Конвертируем все в PDF
     with open(Path + '.pdf', "wb") as file:
             file.write(
                 convert([res for res in result_Of_Downloader])
                 )
+
+    print('Done')
