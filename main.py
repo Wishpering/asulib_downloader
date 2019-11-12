@@ -159,7 +159,7 @@ if __name__ == '__main__':
 
     page_Count = args.get('pages')
 
-    Path = args.get('output_dir') or str(dirname(abspath(__file__))) + '/output'
+    Path = args.get('output_dir') or str(dirname(abspath(__file__)))
     output_File_Name = args.get('file_name') or 'output'
 
     # Проверка на корректность указанного пути
