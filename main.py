@@ -82,7 +82,7 @@ class Parcer:
                 logger.exception('Crash on getting Book_ID and Book_Name')
 
         if self.args.get('verbose') == True:
-                print('Book name -', name_For_Request, 'Book ID -', id_For_Request)
+                print(f'Book name - {name_For_Request}, Book ID - {id_For_Request}')
 
         return id_For_Headers, id_For_Request, name_For_Headers, name_For_Request
 
@@ -97,18 +97,16 @@ class Book:
         generator = RandomGenerator(MT19937(random_entropy()))
         
         # Готовим обманку
-        headers['Referer'] = 'http://elibrary.asu.ru/els/files/book?name=' + str(name_For_Headers) + '&id=' + str(id_For_Headers)
+        headers['Referer'] = f'http://elibrary.asu.ru/els/files/book?name={str(name_For_Headers)}&id={str(id_For_Headers)}'
 
         for task_Num in range(1, page_Count + 1):
             if self.args.get('verbose') == True:
-                print('Preparing task for downloading page №' + str(task_Num))
+                print(f'Preparing task for downloading page №{str(task_Num)}')
 
             tasks.append(
                 asyncio.create_task(
                     Book.__downloader(
-                            'http://elibrary.asu.ru/els/files/test/?name='
-                            + name_For_Request +'&id=' + id_For_Request +'&page=' + str(task_Num)
-                            + '&mode=1',
+                            f'http://elibrary.asu.ru/els/files/test/?name={name_For_Request}&id={id_For_Request}&page={str(task_Num)}&mode=1',
                             headers,
                             task_Num,
                             self.args,
@@ -125,12 +123,12 @@ class Book:
         cooldown = generator.uniform(0, 10)
 
         if args.get('verbose') == True or args.get('debug') == True:
-            print('Waiting ' + str(cooldown) + ' seconds before starting thread №' + str(num_Of_Task))
+            print(f'Waiting {str(cooldown)} seconds before starting thread № {str(num_Of_Task)}')
 
         await asyncio.sleep(cooldown)
 
         if args.get('verbose') == True:
-            print('Spawining thread for downloading page №' + str(num_Of_Task))
+            print(f'Spawining thread for downloading page №{str(num_Of_Task)}')
         
         try:
             async with aiohttp.ClientSession() as session:
@@ -142,7 +140,7 @@ class Book:
 
         except Exception as error:
             if args.get('debug') == True:
-                logger.exception('Can\'not download page №' + num_Of_Task)
+                logger.exception(f'Can\'not download page №{num_Of_Task}')
 
 if __name__ == '__main__':
     # Парсим аргументы
@@ -199,7 +197,7 @@ if __name__ == '__main__':
     # Проверяем, все ли скачалось
     for res, count in zip(result_Of_Downloader, range(1, page_Count + 1)):
         if res == -1:
-            print('Не удалось загрузить страницу №' + str(count))
+            print(f'Не удалось загрузить страницу № {str(count)}')
 
     # Если файл с таким названием уже существует, то запрашиваем другое название
     while exists(Path + output_File_Name + '.pdf') is True:
