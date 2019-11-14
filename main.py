@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 
 from loguru import logger
-from bs4 import BeautifulSoup as bs4
-from os.path import dirname, abspath, exists
-import asyncio
-from threading import Thread
-import aiohttp
 from argparse import ArgumentParser
+import asyncio
+import aiohttp
+from bs4 import BeautifulSoup as bs4
+from threading import Thread
+from os.path import dirname, abspath, exists
 from randomgen import RandomGenerator, MT19937
 from randomgen.entropy import random_entropy
 from img2pdf import convert
@@ -52,7 +52,7 @@ class Parcer:
 
         except Exception as error:
             if self.args.get('debug') == True:
-                logger.exception('Smth went wrong on getting link')
+                logger.exception(f'Smth went wrong on getting link, error - {error}')
             
         try:
             if self.args.get('verbose') == True:
@@ -63,7 +63,7 @@ class Parcer:
         
         except Exception as error:
             if self.args.get('debug') == True:
-                logger.exception('Cannot start BS4')
+                logger.exception(f'Cannot start BS4, error - {error}')
 
         try:
             if self.args.get('verbose') == True:
@@ -79,7 +79,7 @@ class Parcer:
         
         except Exception as error:
             if self.args.get('debug') == True:
-                logger.exception('Crash on getting Book_ID and Book_Name')
+                logger.exception(f'Crash on getting Book_ID and Book_Name, error - {error}')
 
         if self.args.get('verbose') == True:
                 print(f'Book name - {name_For_Request}, Book ID - {id_For_Request}')
@@ -97,7 +97,8 @@ class Book:
         generator = RandomGenerator(MT19937(random_entropy()))
         
         # Готовим обманку
-        headers['Referer'] = f'http://elibrary.asu.ru/els/files/book?name={str(name_For_Headers)}&id={str(id_For_Headers)}'
+        headers['Referer'] = f'http://elibrary.asu.ru/els/files/book' \
+                             f'?name={str(name_For_Headers)}&id={str(id_For_Headers)}'
 
         for task_Num in range(1, page_Count + 1):
             if self.args.get('verbose') == True:
@@ -106,8 +107,9 @@ class Book:
             tasks.append(
                 asyncio.create_task(
                     Book.__downloader(
-                            f'http://elibrary.asu.ru/els/files/test/?name={name_For_Request}&id={id_For_Request}&page={str(task_Num)}&mode=1',
-                            headers,
+                            f'http://elibrary.asu.ru/els/files/test/' \
+                            f'?name={name_For_Request}&id={id_For_Request}' \
+                            f'&page={str(task_Num)}&mode=1',
                             task_Num,
                             self.args,
                             generator
@@ -118,7 +120,7 @@ class Book:
         return await asyncio.gather(*tasks)
 
     @classmethod
-    async def __downloader(cls, link, headers, num_Of_Task, args, generator):
+    async def __downloader(cls, link, num_Of_Task, args, generator):
         # Спим сколько-то перед запуском потока, а то сервак охуевает, если много страниц 
         cooldown = generator.uniform(0, 10)
 
@@ -140,7 +142,7 @@ class Book:
 
         except Exception as error:
             if args.get('debug') == True:
-                logger.exception(f'Can\'not download page №{num_Of_Task}')
+                logger.exception(f'Can\'not download page №{num_Of_Task}, error - {error}')
 
 if __name__ == '__main__':
     # Парсим аргументы
