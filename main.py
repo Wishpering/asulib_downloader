@@ -7,8 +7,7 @@ import aiohttp
 from bs4 import BeautifulSoup as bs4
 from threading import Thread
 from os.path import dirname, abspath, exists
-from randomgen import RandomGenerator, MT19937
-from randomgen.entropy import random_entropy
+from random import SystemRandom
 from img2pdf import convert
 
 headers = {
@@ -38,8 +37,33 @@ class Parcer:
             if self.args.get('verbose') == True:
                 print('Downloading page for parsing...')
 
+            if 'xmlui/bitstream/handle/asu' not in book_Url:
+                if self.args.get('verbose') == True:
+                    print('Book page not found, searching it in link...')
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(book_Url) as request:
+            
+                        if request.status != 200:
+                            if self.args.get('debug') == True:
+                                logger.exception('Can\'not dowload page for finding book link')
+                
+                        request = await request.read()
+
+                soup = bs4(request, 'lxml')
+                content = soup.find_all('a', href = True)
+
+                for line in content:
+                    tmp = line['href']
+                    
+                    if 'xmlui/bitstream/handle/asu' in tmp:
+                        request_Url = f'http://elibrary.asu.ru{tmp}'
+
+                if self.args.get('verbose') == True:
+                    print('Link for book reading founded, dowloading page with it...')
+
             async with aiohttp.ClientSession() as session:
-                async with session.get(book_Url) as request:
+                async with session.get(request_Url) as request:
             
                     if request.status != 200:
                         if self.args.get('debug') == True:
@@ -53,7 +77,7 @@ class Parcer:
         except Exception as error:
             if self.args.get('debug') == True:
                 logger.exception(f'Smth went wrong on getting link, error - {error}')
-            
+
         try:
             if self.args.get('verbose') == True:
                 print('Preparing Beautifulsoup with lxml engine')
@@ -94,7 +118,7 @@ class Book:
     async def download_Book(self, count_Of_Pages, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request):
         tasks = []
 
-        generator = RandomGenerator(MT19937(random_entropy()))
+        generator = SystemRandom()
         
         # Готовим обманку
         headers['Referer'] = f'http://elibrary.asu.ru/els/files/book' \
