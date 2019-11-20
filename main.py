@@ -57,13 +57,14 @@ class Parcer:
                     tmp = line['href']
                     
                     if 'xmlui/bitstream/handle/asu' in tmp:
-                        request_Url = f'http://elibrary.asu.ru{tmp}'
+                        book_Url = f'http://elibrary.asu.ru{tmp}'
+                        break
 
                 if self.args.get('verbose') == True:
                     print('Link for book reading founded, dowloading page with it...')
 
             async with aiohttp.ClientSession() as session:
-                async with session.get(request_Url) as request:
+                async with session.get(book_Url) as request:
             
                     if request.status != 200:
                         if self.args.get('debug') == True:
