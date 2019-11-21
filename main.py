@@ -37,6 +37,8 @@ class Parcer:
             if self.args.get('verbose') == True:
                 print('Downloading page for parsing...')
 
+            # Если ссылка не на чтение книгу, а просто на страницу с книгой,
+            # то вытягиваем ссылку на чтение из неё
             if 'xmlui/bitstream/handle/asu' not in book_Url:
                 if self.args.get('verbose') == True:
                     print('Book page not found, searching it in link...')
@@ -63,6 +65,7 @@ class Parcer:
                 if self.args.get('verbose') == True:
                     print('Link for book reading founded, dowloading page with it...')
 
+            # Скачиваем страничку для чтения и дергаем из неё инфу о книге
             async with aiohttp.ClientSession() as session:
                 async with session.get(book_Url) as request:
             
@@ -191,6 +194,7 @@ if __name__ == '__main__':
     if Path.endswith('/') is False:
         Path += '/'
 
+    # Включаем введение логов при флаге --debug
     if args.get('debug') == True:
         logger.add(
             'log.file', 
@@ -224,7 +228,7 @@ if __name__ == '__main__':
     # Проверяем, все ли скачалось
     for res, count in zip(result_Of_Downloader, range(1, page_Count + 1)):
         if res == -1:
-            print(f'Не удалось загрузить страницу № {str(count)}')
+            print(f'Не удалось загрузить страницу №{str(count)}')
 
     # Если файл с таким названием уже существует, то запрашиваем другое название
     while exists(Path + output_File_Name + '.pdf') is True:
@@ -239,7 +243,9 @@ if __name__ == '__main__':
     # Конвертируем все в PDF
     with open(Path + output_File_Name + '.pdf', "wb") as file:
             file.write(
-                convert([res for res in result_Of_Downloader])
+                convert(
+                    [res for res in result_Of_Downloader]
+                    )
                 )
 
     print('Done')
