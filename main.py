@@ -136,7 +136,7 @@ class Book:
         elif count_Of_Pages >= 250:
             cooldown = 120
 
-        if debug_Mode == True:
+        if self.debug_Mode == True:
             print(f'Delay value set to {cooldown}')
             
         for task_Num in range(1, count_Of_Pages + 1):
