@@ -49,25 +49,12 @@ class Parcer:
                         if request.status == 200:
                             request = await request.read()
                         else:
-                            logger.exception('Can\'not dowload page for finding book link')
-                            return
-                
-                soup = bs4(request, 'lxml')
-                content = soup.find_all('a', href = True)
+                            return {'error' : 'Can\'not dowload page for finding book link'}
 
-                for line in content:
-                    tmp = line['href']
-                    
-                    if 'xmlui/bitstream/handle/asu' in tmp:
-                        book_Url = f'http://elibrary.asu.ru{tmp}'
-                        break
+                book_Url = Parcer.get_Book_Link(request, self.debug_Mode)
 
-                if book_Url == 'http://elibrary.asu.ru':
-                    print('Link for book reading not founded')
-                    return
-
-                if self.debug_Mode == True:
-                    print(f'Link for book reading founded - {book_Url}, dowloading page with it...')
+                if book_Url == -5:
+                    return {'error' : 'Can\'not get book link from page'}
 
             # Скачиваем страничку для чтения и дергаем из неё инфу о книге
             async with aiohttp.ClientSession() as session:
@@ -76,24 +63,32 @@ class Parcer:
                     if request.status == 200:
                         request = await request.read()
                     else:
-                        logger.exception(f'Can\'not dowload page for parsing - {request.status}')
-                        return
+                        return {'error' : f'Can\'not dowload page for parsing - {request.status}'}
 
             if self.debug_Mode == True:
                 print('Page loaded successfully...')
 
         except Exception as error:
             logger.exception(f'Smth went wrong on getting link, error - {error}')
-            return
+            return {'error' : 'Can\'not get link for downloading page'}
 
-        if self.debug_Mode == True:
+        book_Info = Parcer.get_Book_ID(request, self.debug_Mode)
+
+        if book_Info == -4:
+            return {'error' : 'Can\'not get info about book'}
+        else:
+            return book_Info 
+
+    @classmethod
+    def get_Book_ID(cls, page, debug_Mode):
+        if debug_Mode == True:
             print('Preparing Beautifulsoup with lxml engine')
 
-        soup = bs4(request, 'lxml')
+        soup = bs4(page, 'lxml')
         link = soup.frame.extract()['src']
 
         try:
-            if self.debug_Mode == True:
+            if debug_Mode == True:
                 print('Parsing the page to get book name and ID...')
 
             temp = str(link).split('http://elibrary.asu.ru/els/files/book?')[1].split('&')
@@ -106,11 +101,33 @@ class Parcer:
         
         except Exception as error:
             logger.exception(f'Crash on getting Book_ID and Book_Name, error - {error}')
+            return {'error' : 'Crash on getting Book_ID and Book_Name'}
 
-        if self.debug_Mode == True:
+        if debug_Mode == True:
             print(f'Book name - {name_For_Request}, Book ID - {id_For_Request}')
 
-        return id_For_Headers, id_For_Request, name_For_Headers, name_For_Request
+        return {'headers_ID' : id_For_Headers, 'request_ID' : id_For_Request, 'headers_Name' : name_For_Headers, 'request_Name' : name_For_Request}
+
+    @classmethod
+    def get_Book_Link(cls, link, debug_Mode):
+        if debug_Mode == True:
+            print('Preparing Beautifulsoup with lxml engine')
+
+        soup = bs4(link, 'lxml')
+        content = soup.find_all('a', href = True)
+
+        for line in content:
+            tmp = line['href']
+                    
+            if 'xmlui/bitstream/handle/asu' in tmp:
+                if debug_Mode == True:
+                    print(f'Link for book reading founded - http://elibrary.asu.ru{tmp}, dowloading page with it...')
+                
+                return f'http://elibrary.asu.ru{tmp}'
+
+        if book_Url == 'http://elibrary.asu.ru':
+            print('Link for book reading not founded')
+            return -5
 
 class Book:
     def __init__(self, loop, args):
@@ -210,16 +227,19 @@ if __name__ == '__main__':
 
     # Получаем ID и название книги
     # Они слегка отличаются для Headers и для ссылки на скачивание, посему их 4
-    try:
-        id_For_Headers, id_For_Request, \
-            name_For_Headers, name_For_Request \
-                = asyncio.run_coroutine_threadsafe( 
-                    parcer.get_Link(args.get('link')
-                    ), Loop.loop
-                ).result()
-    except (AttributeError, TypeError) as Exceptions:
-        print('Can\'not get book_id, exiting...')
+    book_Info = asyncio.run_coroutine_threadsafe( 
+        parcer.get_Link(args.get('link')), 
+        Loop.loop
+    ).result()
+
+    if 'error' in book_Info:
+        print(book_Info.get('error'))
         exit()
+    else:
+        id_For_Headers = book_Info.get('headers_ID')
+        id_For_Request = book_Info.get('request_ID')
+        name_For_Headers = book_Info.get('headers_Name')
+        name_For_Request = book_Info.get('request_Name')
 
     print('Downloading pages ...')
 
