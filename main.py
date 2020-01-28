@@ -32,7 +32,7 @@ class Parcer:
     def __init__(self, args : dict):
         self.debug_Mode = args.get('debug')
 
-    async def get_Link(self, book_Url):
+    async def get_Book_Info(self, book_Url):
         try:
             if self.debug_Mode == True:
                 print('Downloading page for parsing...')
@@ -106,7 +106,10 @@ class Parcer:
         if debug_Mode == True:
             print(f'Book name - {name_For_Request}, Book ID - {id_For_Request}')
 
-        return {'headers_ID' : id_For_Headers, 'request_ID' : id_For_Request, 'headers_Name' : name_For_Headers, 'request_Name' : name_For_Request}
+        return {
+            'headers_ID' : id_For_Headers, 'request_ID' : id_For_Request, 
+            'headers_Name' : name_For_Headers, 'request_Name' : name_For_Request
+        }
 
     @classmethod
     def get_Book_Link(cls, link, debug_Mode):
@@ -134,7 +137,7 @@ class Book:
         self.loop = Loop
         self.debug_Mode = args.get('debug')
         
-    async def download_Book(self, count_Of_Pages, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request):
+    async def download(self, count_Of_Pages, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request):
         tasks = []
 
         generator = SystemRandom()
@@ -206,14 +209,12 @@ if __name__ == '__main__':
     args = vars(arg_Parser.parse_args())
 
     page_Count = args.get('pages')
-
+    output_File_Name = args.get('file_name') or 'output'
     Path = args.get('output_dir') or str(dirname(abspath(__file__)))
     
     # Проверка на корректность указанного пути
     if Path.endswith('/') is False:
         Path += '/'
-    
-    output_File_Name = args.get('file_name') or 'output'
 
     logger.add(
         'log.file', 
@@ -228,7 +229,7 @@ if __name__ == '__main__':
     # Получаем ID и название книги
     # Они слегка отличаются для Headers и для ссылки на скачивание, посему их 4
     book_Info = asyncio.run_coroutine_threadsafe( 
-        parcer.get_Link(args.get('link')), 
+        parcer.get_Book_Info(args.get('link')), 
         Loop.loop
     ).result()
 
@@ -244,17 +245,17 @@ if __name__ == '__main__':
     print('Downloading pages ...')
 
     # Выкачиваем все странички
-    result_Of_Downloader = asyncio.run_coroutine_threadsafe(
-        downloader.download_Book(
+    book = asyncio.run_coroutine_threadsafe(
+        downloader.download(
             page_Count, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request
         ),
         Loop.loop
     ).result()
 
     # Проверяем, все ли скачалось
-    for res, count in zip(result_Of_Downloader, range(1, page_Count + 1)):
-        if res == -1:
-            print(f'Не удалось загрузить страницу №{count}')
+    for res, page_Num in enumerate(book):
+        if res == -1 :
+            print(f'Не удалось загрузить страницу №{page_Num + 1}')
 
     # Если файл с таким названием уже существует, то запрашиваем другое название
     while exists(f'{Path}{output_File_Name}.pdf') is True:
@@ -270,7 +271,7 @@ if __name__ == '__main__':
     with open(f'{Path}{output_File_Name}.pdf', "wb") as file:
             file.write(
                 convert(
-                    [res for res in result_Of_Downloader]
+                    [res for res in book]
                     )
                 )
 
