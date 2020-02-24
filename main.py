@@ -137,8 +137,7 @@ class Parser:
             return -5
 
 class Book:
-    def __init__(self, loop, args):
-        self.loop = Loop
+    def __init__(self, args):
         self.debug_Mode = args.get('debug')
         
     async def download(self, count_Of_Pages, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request):
@@ -232,7 +231,7 @@ if __name__ == '__main__':
 
     # Создаем экземпляры классов
     parser = Parser(args)
-    book = Book(Loop.loop, args)
+    book = Book(args)
 
     # Получаем ID и название книги
     # Они слегка отличаются для Headers и для ссылки на скачивание, посему их 4
