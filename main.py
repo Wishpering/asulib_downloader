@@ -20,15 +20,11 @@ headers = {
     'Accept-Language' : 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6'
     }
 
-def start_background_loop(loop: asyncio.AbstractEventLoop):
-        asyncio.set_event_loop(loop)
-        loop.run_forever()
-
 class Loop:
-    loop = asyncio.new_event_loop()
-    main_Thread = Thread(target = start_background_loop, args = (loop, ), daemon = True).start()    
+    loop = asyncio.new_event_loop()  
+    main_Thread = Thread(target = loop.run_forever, daemon = True).start()
 
-class Parcer:
+class Parser:
     def __init__(self, args : dict):
         self.debug_Mode = args.get('debug')
 
@@ -37,29 +33,14 @@ class Parcer:
             if self.debug_Mode == True:
                 print('Downloading page for parsing...')
 
-            # Если ссылка не на чтение книгу, а просто на страницу с книгой,
-            # то вытягиваем ссылку на чтение из неё
-            if 'xmlui/bitstream/handle/asu' not in book_Url:
-                if self.debug_Mode == True:
-                    print('Book page not found, searching it in link...')
-
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(book_Url) as request:
-            
-                        if request.status == 200:
-                            request = await request.read()
-                        else:
-                            return {'error' : 'Can\'not dowload page for finding book link'}
-
-                book_Url = Parcer.get_Book_Link(request, self.debug_Mode)
-
-                if book_Url == -5:
-                    return {'error' : 'Can\'not get book link from page'}
-
-            # Скачиваем страничку для чтения и дергаем из неё инфу о книге
             async with aiohttp.ClientSession() as session:
+                # Если ссылка не на чтение книгу, а просто на страницу с книгой,
+                # то вытягиваем ссылку на чтение из неё
+                if 'xmlui/bitstream/handle/asu' not in book_Url:
+                    book_Url = await Parser.get_Read_Link(session, book_Url, self.debug_Mode)
+
+                # Скачиваем страничку для чтения и дергаем из неё инфу о книге
                 async with session.get(book_Url) as request:
-            
                     if request.status == 200:
                         request = await request.read()
                     else:
@@ -72,12 +53,31 @@ class Parcer:
             logger.exception(f'Smth went wrong on getting link, error - {error}')
             return {'error' : 'Can\'not get link for downloading page'}
 
-        book_Info = Parcer.get_Book_ID(request, self.debug_Mode)
+        book_Info = Parser.get_Book_ID(request, self.debug_Mode)
 
         if book_Info == -4:
             return {'error' : 'Can\'not get info about book'}
         else:
             return book_Info 
+
+    @classmethod
+    async def get_Read_Link(cls, session, link, debug_Mode):
+        if debug_Mode == True:
+            print('Book page not found, searching it in link...')
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(link) as request:   
+                if request.status == 200:
+                    request = await request.read()
+                else:
+                    return {'error' : 'Can\'not dowload page for finding book link'}
+
+        book_Url = Parser.get_Book_Link(request, debug_Mode)
+
+        if book_Url == -5:
+            return {'error' : 'Can\'not get book link from page'}
+        else:
+            return book_Url
 
     @classmethod
     def get_Book_ID(cls, page, debug_Mode):
@@ -113,6 +113,8 @@ class Parcer:
 
     @classmethod
     def get_Book_Link(cls, link, debug_Mode):
+        main_Link = 'http://elibrary.asu.ru'
+
         if debug_Mode == True:
             print('Preparing Beautifulsoup with lxml engine')
 
@@ -123,12 +125,14 @@ class Parcer:
             tmp = line['href']
                     
             if 'xmlui/bitstream/handle/asu' in tmp:
-                if debug_Mode == True:
-                    print(f'Link for book reading founded - http://elibrary.asu.ru{tmp}, dowloading page with it...')
-                
-                return f'http://elibrary.asu.ru{tmp}'
+                main_Link += tmp
 
-        if book_Url == 'http://elibrary.asu.ru':
+                if debug_Mode == True:
+                    print(f'Link for book reading founded - {main_Link}, dowloading page with it...')
+                
+                return main_Link
+
+        if main_Link == 'http://elibrary.asu.ru':
             print('Link for book reading not founded')
             return -5
 
@@ -146,7 +150,7 @@ class Book:
         headers['Referer'] = f'http://elibrary.asu.ru/els/files/book' \
                              f'?name={name_For_Headers}&id={id_For_Headers}'
 
-        # Выставляем делей
+        # Выставляем максимальный delay
         if count_Of_Pages < 50:
             cooldown = 5
         elif count_Of_Pages < 85:
@@ -159,24 +163,27 @@ class Book:
         if self.debug_Mode == True:
             print(f'Delay value set to {cooldown}')
             
-        for task_Num in range(1, count_Of_Pages + 1):
-            tasks.append(
-                asyncio.create_task(
-                    Book.__downloader(
+        async with aiohttp.ClientSession() as session:
+
+            for task_Num in range(1, count_Of_Pages + 1):
+                tasks.append(
+                    asyncio.create_task(
+                        Book.__downloader(
+                            session,
                             f'http://elibrary.asu.ru/els/files/test/' \
                             f'?name={name_For_Request}&id={id_For_Request}' \
                             f'&page={task_Num}&mode=1',
                             task_Num,
                             self.debug_Mode,
                             generator.uniform(0, cooldown)
+                        )
                     )
                 )
-            )
             
-        return await asyncio.gather(*tasks)
+            return await asyncio.gather(*tasks)
 
     @classmethod
-    async def __downloader(cls, link, num_Of_Task, debug_Mode, cooldown):
+    async def __downloader(cls, session, link, num_Of_Task, debug_Mode, cooldown):
         # Спим сколько-то перед запуском потока, а то сервак охуевает, если много страниц 
         if debug_Mode == True:
             print(f'Waiting {cooldown} seconds before starting thread № {num_Of_Task}')
@@ -187,15 +194,16 @@ class Book:
             print(f'Spawining thread for downloading page №{num_Of_Task}')
         
         try:
-            async with aiohttp.ClientSession() as session:
-                    async with session.get(link, headers = headers) as request:
-                        if request.status == 200:
-                            return await request.read()
-                        else:
-                            return -1
+            async with session.get(link, headers = headers) as request:
+                if request.status == 200:
+                    return await request.read()
+                else:
+                    return -1
 
         except Exception as error:
             logger.exception(f'Can\'not download page №{num_Of_Task}, error - {error}')
+
+            return -1
 
 if __name__ == '__main__':
     arg_Parser = ArgumentParser(description = 'Скрипт для выкачивания чего-то с elibrary.asu')
@@ -223,37 +231,35 @@ if __name__ == '__main__':
     )
 
     # Создаем экземпляры классов
-    parcer = Parcer(args)
-    downloader = Book(Loop.loop, args)
+    parser = Parser(args)
+    book = Book(Loop.loop, args)
 
     # Получаем ID и название книги
     # Они слегка отличаются для Headers и для ссылки на скачивание, посему их 4
     book_Info = asyncio.run_coroutine_threadsafe( 
-        parcer.get_Book_Info(args.get('link')), 
+        parser.get_Book_Info(args.get('link')), 
         Loop.loop
     ).result()
 
+    # Если что-то пошло не так
     if 'error' in book_Info:
         print(book_Info.get('error'))
         exit()
-    else:
-        id_For_Headers = book_Info.get('headers_ID')
-        id_For_Request = book_Info.get('request_ID')
-        name_For_Headers = book_Info.get('headers_Name')
-        name_For_Request = book_Info.get('request_Name')
 
     print('Downloading pages ...')
 
     # Выкачиваем все странички
-    book = asyncio.run_coroutine_threadsafe(
-        downloader.download(
-            page_Count, id_For_Headers, id_For_Request, name_For_Headers, name_For_Request
+    book_Pages = asyncio.run_coroutine_threadsafe(
+        book.download(
+            page_Count, 
+            book_Info.get('headers_ID'), book_Info.get('request_ID'), 
+            book_Info.get('headers_Name'), book_Info.get('request_Name')
         ),
         Loop.loop
     ).result()
 
     # Проверяем, все ли скачалось
-    for res, page_Num in enumerate(book):
+    for res, page_Num in zip(book_Pages, range(1, page_Count + 1)):
         if res == -1 :
             print(f'Не удалось загрузить страницу №{page_Num + 1}')
 
@@ -271,7 +277,7 @@ if __name__ == '__main__':
     with open(f'{Path}{output_File_Name}.pdf', "wb") as file:
             file.write(
                 convert(
-                    [res for res in book]
+                    [res for res in book_Pages]
                     )
                 )
 
