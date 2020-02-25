@@ -65,12 +65,11 @@ class Parser:
         if debug_Mode == True:
             print('Book page not found, searching it in link...')
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(link) as request:   
-                if request.status == 200:
-                    request = await request.read()
-                else:
-                    return {'error' : 'Can\'not dowload page for finding book link'}
+        async with session.get(link) as request:   
+            if request.status == 200:
+                request = await request.read()
+            else:
+                return {'error' : 'Can\'not dowload page for finding book link'}
 
         book_Url = Parser.get_Book_Link(request, debug_Mode)
 
