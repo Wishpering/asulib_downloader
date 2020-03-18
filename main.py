@@ -38,8 +38,8 @@ class Parser:
                 # то вытягиваем ссылку на чтение из неё
                 if 'xmlui/bitstream/handle/asu' not in book_Url:
                     book_Url = await Parser.get_Read_Link(session, book_Url, self.debug_Mode)
-
-                    if error in book_Url:
+                    
+                    if 'error' in book_Url:
                         return book_Url.get('error')
                     
                 # Скачиваем страничку для чтения и дергаем из неё инфу о книге
