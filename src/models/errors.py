@@ -5,7 +5,10 @@ class BookDownloadError(Exception):
     def __str__(self):
         return(repr(self.code))
 
-class BookNotFound(Exception):
+class EmptyBookPage(Exception):
+    pass
+
+class ReadLinkNotFound(Exception):
     pass
 
 class LinkNotFound(Exception):

@@ -1,9 +1,9 @@
 from pydantic import BaseModel
 
-class Book_Info(BaseModel):
+class BookInfo(BaseModel):
     """ Содержит в себе ID книги """
 
-    headers_id: int
-    request_id: int
+    headers_id: str
+    request_id: str
     headers_name: str
     request_name: str

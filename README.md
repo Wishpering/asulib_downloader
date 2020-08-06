@@ -4,19 +4,25 @@
 
 ## Getting Started
 
+```bash
 git clone https://github.com/Wishpering/asulib_downloader.git
+```
+## Требования
 
-### Требования
+Python 3.6+, пакеты из файла requirements.txt
 
-Для работы нужен интерпретатор Python версии 3.6+ и пакеты из файла requirements.txt
+## Запуск
 
-### Запуск
-
-Устанавливаем нужные пакеты командой pip3 install -r requirements.txt.
-Затем запускаем скрипт, после флага -l указываем ссылку на книгу, а после флага -p так же указываем количество страниц, которое нужно скачать.
-На выходе получаем PDF, состоящий из картинок.
-PROFIT
+Обычный вариант:
+```bash
+pip3 install -r requirements.txt.
+python src -p PAGE_COUNT -l LINK
+```
+Docker:
+```docker
+docker build -t asulib_downloader:latest .
+docker run --rm -it -v $PWD/output_dir:/tmp test sh -c "python /code/src -p PAGE_COUNT -l LINK"
+```
 
 ### Фичи баги и приколы
-
-Указывать количество страниц приходится потому что я не придумал способ подсчета страниц.
+Указывать количество страниц приходится потому что я не придумал способ подсчета страниц. 

@@ -1,4 +1,2 @@
-output*
 *.pdf
-*.txt
-.vscode
+__pycache__
