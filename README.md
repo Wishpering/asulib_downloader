@@ -20,8 +20,8 @@ python src -p PAGE_COUNT -l LINK
 ```
 Docker:
 ```docker
-docker build -t asulib_downloader:latest .
-docker run --rm -it -v $PWD/output_dir:/tmp test sh -c "python /code/src -p PAGE_COUNT -l LINK"
+docker build -t TAG .
+docker run --rm -it -v $PWD/output_dir:/tmp TAG sh -c "python /code/src -p PAGE_COUNT -l LINK"
 ```
 
 ### Фичи баги и приколы
